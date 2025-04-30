@@ -2,43 +2,63 @@
 """
 swell trading bot implentation and intergration
 """
-from typing import final
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
-# from telegram.ext import Updater, CommandHandler
+from typing import Final
+from telegram import (
+  Update, 
+  ReplyKeyboardMarkup, 
+  KeyboardButton
+  )
+from telegram.ext import (
+  Application, 
+  CommandHandler, 
+  MessageHandler, 
+  filters, 
+  ContextTypes
+)
 import requests
-
+from commands import (
+  start_command,
+  trade_command,
+  price_command,
+  Trades_command,
+  help_command,
+  Buysell_command,
+  Settings_command,
+  CreateWallet_command,
+  tip_command,
+  profile_command,
+)
 # Telegram bot token from BotFather
 TELEGRAM_TOKEN = "8010846115:AAGIeu4dBKCxI3vr6CU4BZBkF1Ojh-XYlvU"
-TOKEN: Final = TELEGRAM_API_TOKEN
+TOKEN: Final = TELEGRAM_TOKEN
 
 
-def main():
-  print('Starting Bot......')
-  app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+if __name__ == '__main__':
+    print('Starting Bot......')
+    app = Application.builder().token(TOKEN).build()
 
-  app.add_handler(CommandHandler("start", start))
-  print('Polling......')
-  print('Waiting For User Input......')
-  app.run_polling()
-  # updater.idle()
+    # default commands
+    app.add_handler(CommandHandler('start', start_command))
+    app.add_handler(CommandHandler('trade', trade_command))
+    app.add_handler(CommandHandler('prices', prices_command))
+    app.add_handler(CommandHandler('buysell', Buysell_command))
+    app.add_handler(CommandHandler('wallet', CreateWallet_command))
+    app.add_handler(CommandHandler('tip', tip_command))
+    app.add_handler(CommandHandler('profile', profile_command))
+    app.add_handler(CommandHandler('Trades', Trades_command))
+    app.add_handler(CommandHandler('settings', settings))
+    app.add_handler(CommandHandler('help', help_command))
 
-if __name__ == "__main__":
-  main()
+    # message commands
+    app.add_handler(MessageHandler(filters.TEXT, message_handler))
 
+    # voice commands
+    app.add_handler(MessageHandler(filters.VOICE, voice_messsage))
 
-# def main():
-#     updater = Updater(TELEGRAM_TOKEN, use_context=True)
-#     dp = updater.dispatcher
+    # Errors
+    app.add_error_handler(error)
 
-#     # Add command handlers
-#     dp.add_handler(CommandHandler("start", start))
-#     dp.add_handler(CommandHandler("price", price))
-#     dp.add_handler(CommandHandler("trade", trade))
-
-#     # Start the bot
-#     updater.start_polling()
-#     updater.idle()
-
-# if __name__ == "__main__":
-#     main()
+    # bot Polling
+    print('Polling......')
+    print('Waiting For User Input......')
+    app.run_polling(poll_interval=3)
