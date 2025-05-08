@@ -60,12 +60,6 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler('help', help_command))
     app.add_handler(CallbackQueryHandler(button_callback))
 
-    # message commands
-    # app.add_handler(MessageHandler(filters.TEXT, message_handler))
-
-    # # voice commands
-    # app.add_handler(MessageHandler(filters.VOICE, voice_messsage))
-
     # Errors
     app.add_error_handler(error)
 
