@@ -1,2 +1,6 @@
-.env
-*.pyc
+# .gitignore
+.env           # Excludes the .env file
+*.pyc          # Excludes Python bytecode files
+__pycache__/   # Excludes Python cache directories
+*.db           # Excludes SQLite database files
+*.sqlite3      # Excludes SQLite database files
