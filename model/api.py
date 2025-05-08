@@ -13,17 +13,24 @@
 
 
 
-import requests
-import json
+# import requests
+# import json
  
-url = "https://swellchain-mainnet.infura.io/v3/5460cf9251af48b1bd909965c50c9adf"
-payload = {
-  "jsonrpc": "2.0",
-  "method": "eth_blockNumber",
-  "params": [],
-  "id": 1
-}
-headers = {"content-type": "application/json"}
+# url = "https://swellchain-mainnet.infura.io/v3/5460cf9251af48b1bd909965c50c9adf"
+# payload = {
+#   "jsonrpc": "2.0",
+#   "method": "eth_blockNumber",
+#   "params": [],
+#   "id": 1
+# }
+# headers = {"content-type": "application/json"}
  
-response = requests.post(url, data=json.dumps(payload), headers=headers).json()
-print(response)
+# response = requests.post(url, data=json.dumps(payload), headers=headers).json()
+# print(response)
+
+from store_to_db import fetch_all_from_wallet
+
+wallets = fetch_all_from_wallet()
+
+for wallet in wallets:
+    print(wallet["address"], wallet["private_key"])
