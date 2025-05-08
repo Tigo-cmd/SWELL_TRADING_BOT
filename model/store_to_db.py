@@ -7,7 +7,7 @@ import sqlite3
 
 
 
-async def init_db() -> None:
+def init_db() -> None:
   """
   Initialize the SQLite database and create the wallets table if it doesn't exist.
   """
@@ -41,8 +41,6 @@ async def create_wallet_db(address: str, private_key: str, balance: float) -> No
   """
   conn = sqlite3.connect('wallet.db')
   cursor = conn.cursor()
-  # Create the wallets table if it doesn't exist  
-  # Insert data (securely)
   cursor.execute("INSERT INTO wallets (address, private_key) VALUES (?, ?)", 
                 (address, private_key))
   conn.commit()  # Save changes
