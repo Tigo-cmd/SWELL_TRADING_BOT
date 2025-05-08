@@ -3,6 +3,7 @@
 swell trading bot implentation and intergration
 """
 from typing import Final
+from store_to_db import init_db
 from telegram import (
   Update, 
   ReplyKeyboardMarkup, 
@@ -13,7 +14,8 @@ from telegram.ext import (
   CommandHandler, 
   MessageHandler, 
   filters, 
-  ContextTypes
+  ContextTypes,
+  CallbackQueryHandler
 )
 import requests
 from commands import (
@@ -27,9 +29,13 @@ from commands import (
   CreateWallet_command,
   tip_command,
   profile_command,
+  error,
+  button_callback
 )
+
+init_db()  # Initialize the database when the script runs
 # Telegram bot token from BotFather
-TELEGRAM_TOKEN = "8010846115:AAGIeu4dBKCxI3vr6CU4BZBkF1Ojh-XYlvU"
+TELEGRAM_TOKEN = "7724263220:AAGRtCl3RqV5GzS9gbCKCvZiWUFokjTbQm0"
 TOKEN: Final = TELEGRAM_TOKEN
 
 
@@ -40,20 +46,21 @@ if __name__ == '__main__':
     # default commands
     app.add_handler(CommandHandler('start', start_command))
     app.add_handler(CommandHandler('trade', trade_command))
-    app.add_handler(CommandHandler('prices', prices_command))
+    app.add_handler(CommandHandler('prices', price_command))
     app.add_handler(CommandHandler('buysell', Buysell_command))
     app.add_handler(CommandHandler('wallet', CreateWallet_command))
     app.add_handler(CommandHandler('tip', tip_command))
     app.add_handler(CommandHandler('profile', profile_command))
     app.add_handler(CommandHandler('Trades', Trades_command))
-    app.add_handler(CommandHandler('settings', settings))
+    app.add_handler(CommandHandler('settings', Settings_command))
     app.add_handler(CommandHandler('help', help_command))
+    app.add_handler(CallbackQueryHandler(button_callback))
 
     # message commands
-    app.add_handler(MessageHandler(filters.TEXT, message_handler))
+    # app.add_handler(MessageHandler(filters.TEXT, message_handler))
 
-    # voice commands
-    app.add_handler(MessageHandler(filters.VOICE, voice_messsage))
+    # # voice commands
+    # app.add_handler(MessageHandler(filters.VOICE, voice_messsage))
 
     # Errors
     app.add_error_handler(error)
