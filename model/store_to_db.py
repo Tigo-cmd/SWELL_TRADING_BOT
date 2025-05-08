@@ -35,16 +35,19 @@ def init_db() -> None:
   # The cursor object is used to execute SQL commands.
   # The commit() method is used to save changes to the database.
   # The close() method is used to close the connection to the database.
+
+  
 async def create_wallet_db(address: str, private_key: str, balance: float) -> None:
   """
   Create a SQLite database and a table to store wallet information.
   """
   conn = sqlite3.connect('wallet.db')
   cursor = conn.cursor()
-  cursor.execute("INSERT INTO wallets (address, private_key) VALUES (?, ?)", 
-                (address, private_key))
+  cursor.execute("INSERT INTO wallets (address, private_key, balance) VALUES (?, ?, ?)", 
+                (address, private_key, balance))
   conn.commit()  # Save changes
   conn.close()
+
 
 
 async def fetch_from_wallet(address, private_key):
@@ -63,17 +66,34 @@ async def fetch_from_wallet(address, private_key):
       return "Wallet not found."
 
 
-async def fetch_all_from_wallet():
-  """
-  fetches the address and private keys
-  """
-  conn = sqlite3.connect('wallet.db')
-  cursor = conn.cursor()
+def balance_check(address):
+    """
+    Check the balance of a wallet address.
+    """
+    conn = sqlite3.connect('wallet.db')
+    cursor = conn.cursor()
 
-  cursor.execute("SELECT address, private_key FROM wallets")
-  wallets = cursor.fetchall()  # Returns list of tuples: [(address, private_key), ...]
+    cursor.execute("SELECT balance FROM wallets WHERE address = ?", (address,))
+    result = cursor.fetchone()  # Returns (balance,) or None
 
-  for address, private_key in wallets:
-    yield {"address": address, "private_key": private_key}
+    conn.close()
 
-  conn.close()
+    if result:
+        return result[0]  # Return the balance
+    else:
+        return "Wallet not found."
+
+
+def fetch_all_from_wallet():
+    """
+    Fetches all wallet addresses and private keys as a list of dicts.
+    """
+    conn = sqlite3.connect('wallet.db')
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT address, private_key FROM wallets")
+    wallets = cursor.fetchall()  # List of tuples
+
+    conn.close()
+
+    return [{"address": addr, "private_key": key} for addr, key in wallets]
