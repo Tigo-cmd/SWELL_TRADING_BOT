@@ -32,10 +32,14 @@ from commands import (
   error,
   button_callback
 )
+from dotenv import load_dotenv
+import os
+load_dotenv()
+
 
 init_db()  # Initialize the database when the script runs
 # Telegram bot token from BotFather
-TELEGRAM_TOKEN = "7724263220:AAGRtCl3RqV5GzS9gbCKCvZiWUFokjTbQm0"
+TELEGRAM_TOKEN = os.getenv('SWELL_BOT_API')
 TOKEN: Final = TELEGRAM_TOKEN
 
 
