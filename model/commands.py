@@ -1,6 +1,6 @@
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
-from store_to_db import create_wallet_db, fetch_all_from_wallet, fetch_from_wallet, init_db
+from store_to_db import create_wallet_db, fetch_all_from_wallet, fetch_from_wallet, init_db, balance_check
 from generate_wallet import generate_wallet
 
 
@@ -93,24 +93,23 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await query.message.reply_text("An error occurred while processing your request.")
 
 async def wallet_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, num: int) -> None:
-    await update.callback_query.message.reply_text("generating wallets...") 
-    private_key, address = await generate_wallet()
-    print(private_key, address)
-    await update.callback_query.message.reply_text(f"address: {address}, private_key: {private_key} \n⚠️ do not disclose your key")
-    await create_wallet_db(address, private_key, 0.0)
-    print("Wallet created and stored in the database.")
-
+    await update.callback_query.message.reply_text("generating wallets...")
     if num:
         for _ in range(num):
-            await update.callback_query.message.reply_text("generating wallets...")
             # Generate a new wallet
             # This is a placeholder for the actual wallet generation logic
             # You should replace this with your actual wallet generation code
             private_key, address = await generate_wallet()
             print(private_key, address)
-            await query.message.reply_text(f"address: {address}, private_key: {private_key} \n⚠️ do not disclose your key")
+            await update.callback_query.message.reply_text(f"address: {address}, private_key: {private_key} \n⚠️ do not disclose your key")
             await create_wallet_db(address, private_key, 0.0)
-    print("Wallet created and stored in the database.")
+    else:
+        private_key, address = await generate_wallet()
+        print(private_key, address)
+        await update.callback_query.message.reply_text(f"address: {address}, private_key: {private_key} \n⚠️ do not disclose your key")
+        await create_wallet_db(address, private_key, 0.0)
+        print("Wallet created and stored in the database.")
+        print("Wallet created and stored in the database.")
 
 # Price command
 async def price_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -174,6 +173,12 @@ async def Settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 # function to handle the wallet reply
 async def CreateWallet_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    wallets = fetch_all_from_wallet()
+    if wallets:
+        for wallet in wallets:
+            balance = balance_check(wallet["address"])
+            [InlineKeyboardButton(wallet["address"], callback_data=wallet["address"]), InlineKeyboardButton(balance, callback_data="balance")]
+
     message = "\nwallets"
     keyboard = [
         [InlineKeyboardButton("➕️ Connect Wallet", callback_data='connect_wallet'), InlineKeyboardButton("➕️ Generate New Wallet", callback_data='Generate_wallet')],
