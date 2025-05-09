@@ -31,6 +31,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         [InlineKeyboardButton("🤑️Prices", callback_data='prices'),InlineKeyboardButton("🌟️Buysell", callback_data='buysell')],
         [InlineKeyboardButton("🛠️Settings", callback_data='settings')],
         [InlineKeyboardButton("ℹ️Help", callback_data='help')],
+        [InlineKeyboardButton("❌ Close", callback_data="close")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(
@@ -62,7 +63,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             await help_command(update, context)
             selected = update.callback_query
         elif query.data == "Generate_wallet":
-            await wallet_callback_handler(update, context)
+            await wallet_callback_handler(update, context, 0)
         elif query.data == "5_wallets":
             await wallet_callback_handler(update, context, 5)
             print("Wallet created and stored in the database.")
@@ -85,6 +86,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 address = wallet['address']
                 private_key = wallet['private_key']
                 await query.message.reply_text(f"Address: {address}, Private Key: {private_key}")
+        elif query.data == "close":
+            await query.message.delete()  
         else:
             await query.message.reply_text("Unknown command. Please try again.")
 
@@ -93,6 +96,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await query.message.reply_text("An error occurred while processing your request.")
 
 async def wallet_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, num: int) -> None:
+    user_id = update.effective_user.id
     await update.callback_query.message.reply_text("generating wallets...")
     if num:
         for _ in range(num):
@@ -101,13 +105,15 @@ async def wallet_callback_handler(update: Update, context: ContextTypes.DEFAULT_
             # You should replace this with your actual wallet generation code
             private_key, address = await generate_wallet()
             print(private_key, address)
-            await update.callback_query.message.reply_text(f"address: {address}, private_key: {private_key} \n⚠️ do not disclose your key")
-            await create_wallet_db(address, private_key, 0.0)
+            await create_wallet_db(user_id, address, private_key, 0.0)
+            await update.callback_query.message.reply_text(
+                f"address: {address}, private_key: {private_key} \n⚠️ do not disclose your key"
+            )
     else:
         private_key, address = await generate_wallet()
         print(private_key, address)
+        await create_wallet_db(user_id, address, private_key, 0.0)
         await update.callback_query.message.reply_text(f"address: {address}, private_key: {private_key} \n⚠️ do not disclose your key")
-        await create_wallet_db(address, private_key, 0.0)
         print("Wallet created and stored in the database.")
         print("Wallet created and stored in the database.")
 
@@ -167,43 +173,49 @@ async def Settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         # function to handle the help reply
         pass
 
-
-
-
-
 # function to handle the wallet reply
 async def CreateWallet_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    # message = "\nwallets"
-    wallets = fetch_all_from_wallet()
+    user_id = update.effective_user.id
+    # Check if the user has any wallets
+    # If not, create a new wallet
+    # If the user has wallets, fetch them from the database
+    # and display them in the message
+    message = "\nwallets"
+    wallets = fetch_all_from_wallet(user_id)
     wallet_address = [] # list to store the wallet address in and append to the message if the wallet exists
     num = 1
     if wallets:
         for wallet in wallets:
             balance = balance_check(wallet["address"])
             wallet_address.append(
-                [InlineKeyboardButton(wallet[f"{num}. address"], callback_data=wallet["address"]), 
-                InlineKeyboardButton(balance, callback_data="balance")]
+                [InlineKeyboardButton(f"{num}. {wallet["address"]}", callback_data=wallet["address"]), 
+                InlineKeyboardButton(f"Balance: {balance}", callback_data="balance")]
             )
             num += 1
+    # else:
+    #     await update.callback_query.message.reply_text("No wallets found. Please create a new wallet.")
     keyboard = [
-        [InlineKeyboardButton("➕️ Connect Wallet", callback_data='connect_wallet'), InlineKeyboardButton("➕️ Generate New Wallet", callback_data='Generate_wallet')],
-        [InlineKeyboardButton("➕️ Generate 5 Wallets", callback_data='5_wallets'), InlineKeyboardButton("➕️ Generate 10 Wallets", callback_data='10_wallets')],
+        [InlineKeyboardButton("➕️ Connect Wallet", callback_data='connect_wallet'), 
+        InlineKeyboardButton("➕️ Generate New Wallet", callback_data='Generate_wallet')],
+        [InlineKeyboardButton("➕️ Generate 5 Wallets", callback_data='5_wallets'), 
+        InlineKeyboardButton("➕️ Generate 10 Wallets", callback_data='10_wallets')],
         [InlineKeyboardButton("➕️ Transfer all Swell To One", callback_data='transfer_all')],
         [InlineKeyboardButton("🔃️ Reload All", callback_data='reload_all')],
+        [InlineKeyboardButton("❌ Close", callback_data="close")],
     ]
      # Combine wallet buttons and keyboard buttons
     updated_markup = wallet_address + keyboard
     reply_markup = InlineKeyboardMarkup(updated_markup)
     if update.callback_query:
         await update.callback_query.message.reply_text(
-            "wallets",
-            reply_markup=updated_markup,
+            message,
+            reply_markup=reply_markup,
             parse_mode="Markdown",
             )
     elif update.message:
         await update.message.reply_text(
             message,
-            reply_markup=updated_markup,
+            reply_markup=reply_markup,
             parse_mode="Markdown",
             )
 
