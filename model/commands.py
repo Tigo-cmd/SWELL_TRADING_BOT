@@ -173,30 +173,37 @@ async def Settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 # function to handle the wallet reply
 async def CreateWallet_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    # message = "\nwallets"
     wallets = fetch_all_from_wallet()
+    wallet_address = [] # list to store the wallet address in and append to the message if the wallet exists
+    num = 1
     if wallets:
         for wallet in wallets:
             balance = balance_check(wallet["address"])
-            [InlineKeyboardButton(wallet["address"], callback_data=wallet["address"]), InlineKeyboardButton(balance, callback_data="balance")]
-
-    message = "\nwallets"
+            wallet_address.append(
+                [InlineKeyboardButton(wallet[f"{num}. address"], callback_data=wallet["address"]), 
+                InlineKeyboardButton(balance, callback_data="balance")]
+            )
+            num += 1
     keyboard = [
         [InlineKeyboardButton("➕️ Connect Wallet", callback_data='connect_wallet'), InlineKeyboardButton("➕️ Generate New Wallet", callback_data='Generate_wallet')],
         [InlineKeyboardButton("➕️ Generate 5 Wallets", callback_data='5_wallets'), InlineKeyboardButton("➕️ Generate 10 Wallets", callback_data='10_wallets')],
         [InlineKeyboardButton("➕️ Transfer all Swell To One", callback_data='transfer_all')],
         [InlineKeyboardButton("🔃️ Reload All", callback_data='reload_all')],
     ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+     # Combine wallet buttons and keyboard buttons
+    updated_markup = wallet_address + keyboard
+    reply_markup = InlineKeyboardMarkup(updated_markup)
     if update.callback_query:
         await update.callback_query.message.reply_text(
-            message,
-            reply_markup=reply_markup,
+            "wallets",
+            reply_markup=updated_markup,
             parse_mode="Markdown",
             )
     elif update.message:
         await update.message.reply_text(
             message,
-            reply_markup=reply_markup,
+            reply_markup=updated_markup,
             parse_mode="Markdown",
             )
 
