@@ -1,6 +1,13 @@
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
-from store_to_db import create_wallet_db, fetch_all_from_wallet, fetch_from_wallet, init_db, balance_check
+from store_to_db import (
+    create_wallet_db, 
+    fetch_all_from_wallet, 
+    fetch_from_wallet, 
+    init_db, 
+    balance_check, 
+    delete_wallets_by_user
+    )
 from generate_wallet import generate_wallet
 
 
@@ -52,6 +59,11 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         if query.data == "trade":
             await trade_command(update, context)
         elif query.data == "wallet":
+            await CreateWallet_command(update, context)
+        elif query.data == "remove_all":
+            delete_wallets_by_user(update.effective_user.id)
+            await query.message.delete()  # Delete the message
+            await CreateWallet_command(update, context)
             await CreateWallet_command(update, context)
         elif query.data == "profile":
             await profile_command(update, context)
@@ -113,8 +125,7 @@ async def wallet_callback_handler(update: Update, context: ContextTypes.DEFAULT_
         private_key, address = await generate_wallet()
         print(private_key, address)
         await create_wallet_db(user_id, address, private_key, 0.0)
-        await update.callback_query.message.reply_text(f"address: {address}, private_key: {private_key} \n⚠️ do not disclose your key")
-        print("Wallet created and stored in the database.")
+        await update.callback_query.message.reply_text(f"New Wallet Info: \nAddress: \n`{address}`, Private_key: \n`{private_key}` \n⚠️ do not disclose your key")
         print("Wallet created and stored in the database.")
 
 # Price command
@@ -195,7 +206,6 @@ async def CreateWallet_command(update: Update, context: ContextTypes.DEFAULT_TYP
         message = f"Wallets ({num})"
     else:
         message = "No wallets found. Please create a new wallet."
-        await update.message.reply_text(message)
     keyboard = [
         [InlineKeyboardButton("➕️ Connect Wallet", callback_data='connect_wallet'), 
         InlineKeyboardButton("➕️ Generate New Wallet", callback_data='Generate_wallet')],
