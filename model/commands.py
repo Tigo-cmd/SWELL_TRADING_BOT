@@ -107,7 +107,7 @@ async def wallet_callback_handler(update: Update, context: ContextTypes.DEFAULT_
             print(private_key, address)
             await create_wallet_db(user_id, address, private_key, 0.0)
             await update.callback_query.message.reply_text(
-                f"address: {address}, private_key: {private_key} \n⚠️ do not disclose your key"
+                f"address: `{address}`, private_key: `{private_key}` \n⚠️ do not disclose your key"
             )
     else:
         private_key, address = await generate_wallet()
@@ -180,7 +180,7 @@ async def CreateWallet_command(update: Update, context: ContextTypes.DEFAULT_TYP
     # If not, create a new wallet
     # If the user has wallets, fetch them from the database
     # and display them in the message
-    message = "\nwallets"
+    message = "Wallets"
     wallets = fetch_all_from_wallet(user_id)
     wallet_address = [] # list to store the wallet address in and append to the message if the wallet exists
     num = 1
@@ -188,19 +188,21 @@ async def CreateWallet_command(update: Update, context: ContextTypes.DEFAULT_TYP
         for wallet in wallets:
             balance = balance_check(wallet["address"])
             wallet_address.append(
-                [InlineKeyboardButton(f"{num}. {wallet["address"]}", callback_data=wallet["address"]), 
+                [InlineKeyboardButton(f"{num}. {wallet["address"]}", callback_data="address"), 
                 InlineKeyboardButton(f"Balance: {balance}", callback_data="balance")]
             )
             num += 1
-    # else:
-    #     await update.callback_query.message.reply_text("No wallets found. Please create a new wallet.")
+        message = f"Wallets ({num})"
+    else:
+        message = "No wallets found. Please create a new wallet."
+        await update.message.reply_text(message)
     keyboard = [
         [InlineKeyboardButton("➕️ Connect Wallet", callback_data='connect_wallet'), 
         InlineKeyboardButton("➕️ Generate New Wallet", callback_data='Generate_wallet')],
         [InlineKeyboardButton("➕️ Generate 5 Wallets", callback_data='5_wallets'), 
         InlineKeyboardButton("➕️ Generate 10 Wallets", callback_data='10_wallets')],
         [InlineKeyboardButton("➕️ Transfer all Swell To One", callback_data='transfer_all')],
-        [InlineKeyboardButton("🔃️ Reload All", callback_data='reload_all')],
+        [InlineKeyboardButton("🔃️ Reload List", callback_data='reload_all'), InlineKeyboardButton("🗑️ Remove All", callback_data='remove_all')],
         [InlineKeyboardButton("❌ Close", callback_data="close")],
     ]
      # Combine wallet buttons and keyboard buttons
