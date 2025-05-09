@@ -30,7 +30,8 @@ from commands import (
   tip_command,
   profile_command,
   error,
-  button_callback
+  button_callback,
+  message_handler
 )
 from dotenv import load_dotenv
 import os
@@ -59,6 +60,7 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler('settings', Settings_command))
     app.add_handler(CommandHandler('help', help_command))
     app.add_handler(CallbackQueryHandler(button_callback))
+    app.add_handler(MessageHandler(filters.TEXT, message_handler))
 
     # Errors
     app.add_error_handler(error)

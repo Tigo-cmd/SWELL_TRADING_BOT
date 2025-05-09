@@ -103,7 +103,7 @@ def fetch_all_from_wallet(user_id:int)->[dict]:
     return [{"address": addr, "private_key": key} for addr, key in wallets]
 
 
-def delete_wallets_by_user(user_id: int) -> None:
+async def delete_wallets_by_user(user_id: int) -> None:
     """
     Delete all wallets for a specific user.
     """

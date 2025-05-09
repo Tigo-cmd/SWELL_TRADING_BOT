@@ -61,12 +61,15 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         elif query.data == "wallet":
             await CreateWallet_command(update, context)
         elif query.data == "remove_all":
-            delete_wallets_by_user(update.effective_user.id)
-            await query.message.delete()  # Delete the message
-            await CreateWallet_command(update, context)
-            await CreateWallet_command(update, context)
+            await query.message.reply_text(
+                "Are you sure you want to remove all wallets? Type *CONFIRM* to proceed.",
+                parse_mode="Markdown",
+            )
+            context.user_data["awaiting_confirmation"] = "remove_all"  # Set confirmation state
         elif query.data == "profile":
             await profile_command(update, context)
+        elif query.data = "address":
+            await address_handler(update, context)
         elif query.data == "trades":
             await Trades_command(update, context)
         elif query.data == "settings":
@@ -107,11 +110,32 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         print(f"Error handling callback: {e}")
         await query.message.reply_text("An error occurred while processing your request.")
 
+s
+
+async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_message = update.message.text.strip()  # Get the user's message
+    print(user_message)
+    user_id = update.effective_user.id
+    # Check if the user is in a confirmation state
+    if context.user_data.get("awaiting_confirmation") == "remove_all":
+        if user_message.upper() == "CONFIRM":
+            # Perform the remove_all action
+            await delete_wallets_by_user(user_id)
+            # await update.message.reply_text("All your wallets have been removed.")
+            # Clear the confirmation state
+            context.user_data["awaiting_confirmation"] = None
+        else:
+            await update.message.reply_text(
+                "Action canceled. Type *CONFIRM* if you want to proceed.",
+                parse_mode="Markdown",
+            )
+        await update.message.delete()  # Delete the message after confirmation
+        await CreateWallet_command(update, context)
 async def wallet_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, num: int) -> None:
     user_id = update.effective_user.id
     await update.callback_query.message.reply_text("generating wallets...")
     if num:
-        for _ in range(num):
+        for i in range(num):
             # Generate a new wallet
             # This is a placeholder for the actual wallet generation logic
             # You should replace this with your actual wallet generation code
@@ -119,13 +143,13 @@ async def wallet_callback_handler(update: Update, context: ContextTypes.DEFAULT_
             print(private_key, address)
             await create_wallet_db(user_id, address, private_key, 0.0)
             await update.callback_query.message.reply_text(
-                f"address: `{address}`, private_key: `{private_key}` \n⚠️ do not disclose your key"
+                f"Wallet ({i}) info: \nAddress: \n{address}, \nPrivate_key: \n{private_key} \n⚠️ do not disclose your key"
             )
     else:
         private_key, address = await generate_wallet()
         print(private_key, address)
         await create_wallet_db(user_id, address, private_key, 0.0)
-        await update.callback_query.message.reply_text(f"New Wallet Info: \nAddress: \n`{address}`, Private_key: \n`{private_key}` \n⚠️ do not disclose your key")
+        await update.callback_query.message.reply_text(f"New Wallet Info: \nAddress: \n```{address}, \nPrivate_key: \n```{private_key} \n⚠️ do not disclose your key")
         print("Wallet created and stored in the database.")
 
 # Price command
@@ -203,7 +227,7 @@ async def CreateWallet_command(update: Update, context: ContextTypes.DEFAULT_TYP
                 InlineKeyboardButton(f"Balance: {balance}", callback_data="balance")]
             )
             num += 1
-        message = f"Wallets ({num})"
+        message = f"Wallets ({num - 1})"
     else:
         message = "No wallets found. Please create a new wallet."
     keyboard = [
