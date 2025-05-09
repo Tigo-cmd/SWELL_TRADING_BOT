@@ -22,6 +22,7 @@ def init_db() -> None:
   cursor.execute('''
   CREATE TABLE IF NOT EXISTS wallets (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
       address TEXT UNIQUE NOT NULL,
       private_key TEXT UNIQUE NOT NULL,
       balance REAL NOT NULL
@@ -37,21 +38,24 @@ def init_db() -> None:
   # The close() method is used to close the connection to the database.
 
   
-async def create_wallet_db(address: str, private_key: str, balance: float) -> None:
+async def create_wallet_db(user_id:int, address: str, private_key: str, balance: float) -> None:
   """
   Create a SQLite database and a table to store wallet information.
   """
   conn = sqlite3.connect('wallet.db')
   cursor = conn.cursor()
-  cursor.execute("INSERT INTO wallets (address, private_key, balance) VALUES (?, ?, ?)", 
-                (address, private_key, balance))
+  cursor.execute("INSERT INTO wallets (user_id, address, private_key, balance) VALUES (?, ?, ?, ?)", 
+                (user_id, address, private_key, balance))
   conn.commit()  # Save changes
   conn.close()
 
 
 
-async def fetch_from_wallet(address, private_key):
-
+async def fetch_from_wallet(user_id:int, address:str, private_key:str) -> (str, str):
+  """
+  Fetch a wallet address and private key from the database.
+  """
+  # Connect to the SQLite database (or create it if it doesn't exist)
   conn = sqlite3.connect('wallet.db')
   cursor = conn.cursor()
   cursor.execute("SELECT private_key FROM wallets WHERE address = ?", (address,))
@@ -84,14 +88,14 @@ def balance_check(address):
         return "Wallet not found."
 
 
-def fetch_all_from_wallet():
+def fetch_all_from_wallet(user_id:int)->[dict]:
     """
     Fetches all wallet addresses and private keys as a list of dicts.
     """
     conn = sqlite3.connect('wallet.db')
     cursor = conn.cursor()
 
-    cursor.execute("SELECT address, private_key FROM wallets")
+    cursor.execute("SELECT address, private_key FROM wallets WHERE user_id = ?", (user_id,))
     wallets = cursor.fetchall()  # List of tuples
 
     conn.close()
