@@ -101,3 +101,15 @@ def fetch_all_from_wallet(user_id:int)->[dict]:
     conn.close()
 
     return [{"address": addr, "private_key": key} for addr, key in wallets]
+
+
+def delete_wallets_by_user(user_id: int) -> None:
+    """
+    Delete all wallets for a specific user.
+    """
+    conn = sqlite3.connect('wallet.db')
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM wallets WHERE user_id = ?", (user_id,))
+    conn.commit()  # Save changes
+    conn.close()
+    print(f"All wallets for user {user_id} have been deleted.")
