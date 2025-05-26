@@ -113,3 +113,14 @@ async def delete_wallets_by_user(user_id: int) -> None:
     conn.commit()  # Save changes
     conn.close()
     print(f"All wallets for user {user_id} have been deleted.")
+
+async def delete_specific_wallet(user_id:int, addr:str) -> None:
+  """
+  delete specific wallet from database based on user id
+  """
+  conn = sqlite3.connect('wallet.db')
+  cusor = conn.cursor()
+  cusor.execute("DELETE FROM wallets WHERE address = ? AND user_id = ?", (addr, user_id))
+  conn.commit()
+  conn.close()
+  print(f"Wallet with address {addr} for user {user_id} has been deleted.")

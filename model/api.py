@@ -1,36 +1,29 @@
-# from web3 import Web3
-# import secrets
+import requests
+import os
+from dotenv import load_dotenv
+load_dotenv()
 
-# private_key = secrets.token_hex(32)
-# w3 = Web3(Web3.HTTPProvider("https:///v3/5460cf9251af48b1bd909965c50c9adf/"))
+def get_swell_price():
+    api_key = os.getenv('CMC_API_KEY')
+    if not api_key:
+        raise ValueError("Please set the 'CMC_API_KEY' environment variable.")
 
-# account = w3.eth.account.from_key(private_key)
-# address = account.address
-# print(f"Private Key: {private_key}")
-# print(f"Address: {address}")
+    url = 'https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest'
+    parameters = {
+        'symbol': 'SWELL',
+        'convert': 'USD'
+    }
 
+    headers = {
+        'Accepts': 'application/json',
+        'X-CMC_PRO_API_KEY': api_key
+    }
 
+    response = requests.get(url, headers=headers, params=parameters)
+    data = response.json()
 
-
-
-# import requests
-# import json
- 
-# url = "https://swellchain-mainnet.infura.io/v3/5460cf9251af48b1bd909965c50c9adf"
-# payload = {
-#   "jsonrpc": "2.0",
-#   "method": "eth_blockNumber",
-#   "params": [],
-#   "id": 1
-# }
-# headers = {"content-type": "application/json"}
- 
-# response = requests.post(url, data=json.dumps(payload), headers=headers).json()
-# print(response)
-
-from store_to_db import fetch_all_from_wallet
-
-wallets = fetch_all_from_wallet()
-
-for wallet in wallets:
-    print(wallet["address"], wallet["private_key"])
+    try:
+        price = data['data']['SWELL']['quote']['USD']['price']
+        return price
+    except KeyError:
+        print("SWELL data not found in the API response.")

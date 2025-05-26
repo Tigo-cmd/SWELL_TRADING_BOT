@@ -1,18 +1,23 @@
-from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, ForceReply
+from telegram.ext import ContextTypes
 from store_to_db import (
     create_wallet_db, 
     fetch_all_from_wallet, 
     fetch_from_wallet, 
     init_db, 
     balance_check, 
-    delete_wallets_by_user
+    delete_wallets_by_user,
+    delete_specific_wallet
     )
+from api import get_swell_price
+from telegram.helpers import escape_markdown
 from generate_wallet import generate_wallet
+import asyncio
 
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None : 
-    swell_price = "0.009683"  # Static for example — you could fetch this dynamically
+    swell_price = get_swell_price()
+    swell_price = "{:,.6f}".format(swell_price)  # Format the price to 2 decimal places
     username = update.message.from_user.username
     if username:
         welcome_text = (
@@ -58,18 +63,25 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     try:
         if query.data == "trade":
             await trade_command(update, context)
+        elif query.data == "return_":
+            await query.message.delete()
+            await CreateWallet_command(update, context)
         elif query.data == "wallet":
             await CreateWallet_command(update, context)
         elif query.data == "remove_all":
             await query.message.reply_text(
                 "Are you sure you want to remove all wallets? Type *CONFIRM* to proceed.",
+                reply_markup=ForceReply(selective=True),
                 parse_mode="Markdown",
             )
             context.user_data["awaiting_confirmation"] = "remove_all"  # Set confirmation state
+            # asyncio.sleep(5)  # Wait for 5 seconds before deleting the message
+            # await confirmation_message.delete()  # Delete the confirmation message
         elif query.data == "profile":
             await profile_command(update, context)
-        elif query.data = "address":
-            await address_handler(update, context)
+        elif query.data.startswith("address_"):
+            address = query.data.split("_", 1)[1]
+            await address_handler(update, context, address)
         elif query.data == "trades":
             await Trades_command(update, context)
         elif query.data == "settings":
@@ -102,17 +114,45 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 private_key = wallet['private_key']
                 await query.message.reply_text(f"Address: {address}, Private Key: {private_key}")
         elif query.data == "close":
-            await query.message.delete()  
+            await query.message.delete()
+        elif query.data.startswith("delete"):
+            await query.message.reply_text(
+                "Are you sure you want to delete this wallet? Type *CONFIRM* to proceed.",
+                reply_markup=ForceReply(selective=True),
+                parse_mode="Markdown",
+            )
+            context.user_data["awaiting_confirmation"] = "delete"  # Set confirmation state
+            address = query.data.split("_", 1)[1]
+            await message_handler(update, context, address)
         else:
             await query.message.reply_text("Unknown command. Please try again.")
+
 
     except Exception as e:
         print(f"Error handling callback: {e}")
         await query.message.reply_text("An error occurred while processing your request.")
 
-s
 
-async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def address_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, addr:str) -> None:
+    message = f"Address: {addr}\n"
+    # Fetch the private key from the database
+    Button = [
+        [InlineKeyboardButton("✍️ Edit", callback_data='edit'), InlineKeyboardButton("🗑️ Delete", callback_data=f'delete{addr}')],
+        [InlineKeyboardButton("🔃️ Transfer Swell", callback_data='reload_all'), InlineKeyboardButton(" Transfer to First 10 Wallets", callback_data="first_10")],
+        [InlineKeyboardButton("🔃️ Transfer Token", callback_data='transfer_token')],
+        [InlineKeyboardButton("🔃️ Return To Wallets", callback_data='return_')],
+        [InlineKeyboardButton("❌ Close", callback_data="close")],
+    ]
+
+    reply_markup = InlineKeyboardMarkup(Button)
+
+    await update.callback_query.message.reply_text(
+        message,
+        reply_markup=reply_markup,
+        parse_mode="Markdown",
+    )
+
+async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, addr:str = None) -> None:
     user_message = update.message.text.strip()  # Get the user's message
     print(user_message)
     user_id = update.effective_user.id
@@ -131,6 +171,20 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             )
         await update.message.delete()  # Delete the message after confirmation
         await CreateWallet_command(update, context)
+    elif context.user_data.get("awaiting_confirmation") == "delete":
+        if user_message.upper() == "CONFIRM":
+            # Perform the delete action
+            await delete_specific_wallet(user_id, addr)
+            # await update.message.reply_text("Your wallet has been deleted.")
+            # Clear the confirmation state
+            context.user_data["awaiting_confirmation"] = None
+        else:
+            await update.message.reply_text(
+                "Action canceled. Type *CONFIRM* if you want to proceed.",
+                parse_mode="Markdown",
+            )
+
+
 async def wallet_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, num: int) -> None:
     user_id = update.effective_user.id
     await update.callback_query.message.reply_text("generating wallets...")
@@ -142,14 +196,20 @@ async def wallet_callback_handler(update: Update, context: ContextTypes.DEFAULT_
             private_key, address = await generate_wallet()
             print(private_key, address)
             await create_wallet_db(user_id, address, private_key, 0.0)
+            escaped_key = escape_markdown(private_key, version=2)
             await update.callback_query.message.reply_text(
-                f"Wallet ({i}) info: \nAddress: \n{address}, \nPrivate_key: \n{private_key} \n⚠️ do not disclose your key"
+                f"New Wallet Info: \nAddress: \n<code>{address}</code>  \nPrivate_key: \n<tg-spoiler>{escaped_key}</tg-spoiler> \n⚠️ do not disclose your key",
+                parse_mode="HTML", # Use HTML to format the message
             )
     else:
         private_key, address = await generate_wallet()
         print(private_key, address)
         await create_wallet_db(user_id, address, private_key, 0.0)
-        await update.callback_query.message.reply_text(f"New Wallet Info: \nAddress: \n```{address}, \nPrivate_key: \n```{private_key} \n⚠️ do not disclose your key")
+        escaped_key = escape_markdown(private_key, version=2)
+        await update.callback_query.message.reply_text(
+            f"New Wallet Info: \nAddress: \n<code>{address}</code>  \nPrivate_key: \n<tg-spoiler>{escaped_key}</tg-spoiler> \n⚠️ do not disclose your key",
+            parse_mode="HTML", # Use HTML to format the message
+        )
         print("Wallet created and stored in the database.")
 
 # Price command
@@ -162,12 +222,14 @@ async def price_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     except Exception as e:
        await update.message.reply_text(f"Error: {str(e)}")
 
+
 # Trade command (example: buy order)
 async def trade_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.callback_query:
         await update.callback_query.message.reply_text("I'm Here To Help")
     elif update.message:
         await update.message.reply_text("I'm Here To Help")
+
 
 # function to handle the trades command
 async def Trades_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -223,7 +285,7 @@ async def CreateWallet_command(update: Update, context: ContextTypes.DEFAULT_TYP
         for wallet in wallets:
             balance = balance_check(wallet["address"])
             wallet_address.append(
-                [InlineKeyboardButton(f"{num}. {wallet["address"]}", callback_data="address"), 
+                [InlineKeyboardButton(f"{num}. {wallet["address"]}", callback_data=f"address_{wallet["address"]}"), 
                 InlineKeyboardButton(f"Balance: {balance}", callback_data="balance")]
             )
             num += 1
