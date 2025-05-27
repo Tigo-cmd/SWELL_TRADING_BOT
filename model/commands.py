@@ -24,7 +24,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         f"Welcome @{username}\n"
         "🚀 SwellTradingBot: Your all-in-one toolkit for Swell trading 🪙\n\n"
         f"💰 SWELL Price: ${swell_price}\n\n"
-        "🧱 Create your first wallet at /wallets\n"
+        "🧱 Create your wallets at /wallets\n"
         "[Website](https://swelltradingbot.vercel.app)| [Github](https://github.com/SwellTradingBot/) | [Twitter](https://x.com/swelltradingbot)"
     )
     else:
@@ -38,7 +38,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
     # Create a keyboard with buttons
     keyboard = [
-        [InlineKeyboardButton("📈️Trade", callback_data='trade'),InlineKeyboardButton("💳️Wallets", callback_data='wallet')],
+        [InlineKeyboardButton("📈️Trades", callback_data='trades'),InlineKeyboardButton("💳️Wallets", callback_data='wallet')],
         [InlineKeyboardButton("👨‍🦱️Profile", callback_data='profile'),InlineKeyboardButton("♦️Trades", callback_data='trades')],
         [InlineKeyboardButton("🤑️Prices", callback_data='prices'),InlineKeyboardButton("🌟️Buysell", callback_data='buysell')],
         [InlineKeyboardButton("🛠️Settings", callback_data='settings')],
@@ -61,9 +61,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     # Map callback data to functions or responses
     try:
-        if query.data == "trade":
-            await trade_command(update, context)
-        elif query.data == "return_":
+        if query.data == "return_":
             await query.message.delete()
             await CreateWallet_command(update, context)
         elif query.data == "wallet":
@@ -223,20 +221,12 @@ async def price_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
        await update.message.reply_text(f"Error: {str(e)}")
 
 
-# Trade command (example: buy order)
-async def trade_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if update.callback_query:
-        await update.callback_query.message.reply_text("I'm Here To Help")
-    elif update.message:
-        await update.message.reply_text("I'm Here To Help")
-
-
 # function to handle the trades command
 async def Trades_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.callback_query:
-        await update.callback_query.message.reply_text("I'm Here To Help")
+        await update.callback_query.message.reply_text("You Don't Have Any Transaction Yet")
     elif update.message:
-        await update.message.reply_text("I'm Here To Help")
+        await update.message.reply_text("You Don't Have Any Transaction Yet")
 
 
 # function to handle the help reply
@@ -333,7 +323,16 @@ async def tip_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
 # function to handle the profile reply
 async def profile_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if update.callback_query:
-        await update.callback_query.message.reply_text("I'm Here To Help")
-    elif update.message:
-        await update.message.reply_text("I'm Here To Help")
+    # This function should fetch the user's profile information from the database
+    user_id = update.effective_user.id
+    wallets = await fetch_all_from_wallet(user_id)
+    if not wallets:
+        await update.message.reply_text("You don't have any wallets yet. Please create a wallet using /wallets.")
+        return
+    message = "🆔️ Your Profile:\n"
+    for wallet in wallets:
+        address = wallet['address']
+        private_key = wallet['private_key']
+        balance = await balance_check(address)
+        message += f"Address: {address}\nPrivate Key: {private_key}\nBalance: {balance}\n\n"
+    await update.message.reply_text(message, parse_mode="Markdown")

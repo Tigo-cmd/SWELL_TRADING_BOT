@@ -20,7 +20,6 @@ from telegram.ext import (
 import requests
 from commands import (
   start_command,
-  trade_command,
   price_command,
   Trades_command,
   help_command,
@@ -50,7 +49,6 @@ if __name__ == '__main__':
 
     # default commands
     app.add_handler(CommandHandler('start', start_command))
-    app.add_handler(CommandHandler('trade', trade_command))
     app.add_handler(CommandHandler('prices', price_command))
     app.add_handler(CommandHandler('buysell', Buysell_command))
     app.add_handler(CommandHandler('wallet', CreateWallet_command))
