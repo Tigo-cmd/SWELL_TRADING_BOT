@@ -1,5 +1,6 @@
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, ForceReply
 from telegram.ext import ContextTypes
+from utils import shorten_address
 from store_to_db import (
     create_wallet_db, 
     fetch_all_from_wallet, 
@@ -13,6 +14,10 @@ from api import get_swell_price
 from telegram.helpers import escape_markdown
 from generate_wallet import generate_wallet
 import asyncio
+from mainet import SwellSwapper
+from web3 import Web3
+
+swapper = SwellSwapper()
 
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None : 
@@ -39,7 +44,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     # Create a keyboard with buttons
     keyboard = [
         [InlineKeyboardButton("📈️Trades", callback_data='trades'),InlineKeyboardButton("💳️Wallets", callback_data='wallet')],
-        [InlineKeyboardButton("👨‍🦱️Profile", callback_data='profile'),InlineKeyboardButton("♦️Trades", callback_data='trades')],
+        [InlineKeyboardButton("👨‍🦱️Profile", callback_data='profile')],
         [InlineKeyboardButton("🤑️Prices", callback_data='prices'),InlineKeyboardButton("🌟️Buysell", callback_data='buysell')],
         [InlineKeyboardButton("🛠️Settings", callback_data='settings')],
         [InlineKeyboardButton("ℹ️Help", callback_data='help')],
@@ -64,6 +69,44 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         if query.data == "return_":
             await query.message.delete()
             await CreateWallet_command(update, context)
+                # In your button_callback function, add:
+        elif query.data == 'enter_token_address':
+            await query.message.reply_text(
+                "📝 Please paste the token contract address:",
+                reply_markup=ForceReply(selective=True)
+            )
+            context.user_data['awaiting_token_address'] = True
+        
+        elif query.data.startswith('buy_'):
+            token_address = query.data.split('_')[1]
+            # Fetch user's wallets
+            user_id = update.effective_user.id
+            wallets = fetch_all_from_wallet(user_id)
+            
+            if not wallets:
+                await query.message.reply_text(
+                    "❌ No wallets found. Please create a wallet first using /wallet"
+                )
+                return
+            
+            # Create wallet selection buttons
+            wallet_buttons = []
+            for wallet in wallets:
+                short_address = shorten_address(wallet["address"])
+                wallet_buttons.append([
+                    InlineKeyboardButton(
+                        f"💳 {short_address}",
+                        callback_data=f"select_wallet_{wallet['address']}_{token_address}"
+                    )
+                ])
+            
+            wallet_buttons.append([InlineKeyboardButton("❌ Cancel", callback_data='buysell')])
+            reply_markup = InlineKeyboardMarkup(wallet_buttons)
+            
+            await query.message.reply_text(
+                "Select a wallet to trade with:",
+                reply_markup=reply_markup
+            )
         elif query.data == "wallet":
             await CreateWallet_command(update, context)
         elif query.data == "remove_all":
@@ -87,6 +130,9 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         elif query.data == "help":
             await help_command(update, context)
             selected = update.callback_query
+        elif query.data == "swap_tokens":
+            await token_swap(update, context)
+            await query.message.delete()
         elif query.data == "Generate_wallet":
             await wallet_callback_handler(update, context, 0)
         elif query.data == "5_wallets":
@@ -130,6 +176,18 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         print(f"Error handling callback: {e}")
         await query.message.reply_text("An error occurred while processing your request.")
 
+
+async def token_swap(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.callback_query:
+        keyboard = [
+            [InlineKeyboardButton("🔃️ SWELL/USDT", callback_data='swap_swell/usdt')],
+        ]
+    updated = InlineKeyboardMarkup(keyboard)
+    await update.callback_query.message.reply_text(
+        "Select a token to swap:",
+        reply_markup=updated,
+        parse_mode="Markdown"
+    )
 
 async def address_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, addr:str) -> None:
     message = f"Address: {addr}\n"
@@ -181,7 +239,15 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, ad
                 "Action canceled. Type *CONFIRM* if you want to proceed.",
                 parse_mode="Markdown",
             )
-
+    elif context.user_data.get('awaiting_token_address'):
+        if Web3.is_address(user_message):
+            context.user_data['awaiting_token_address'] = False
+            await analyze_token(update, context, user_message)
+        else:
+            await update.message.reply_text(
+                "❌ Invalid token address. Please enter a valid contract address."
+            )
+        return
 
 async def wallet_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, num: int) -> None:
     user_id = update.effective_user.id
@@ -250,11 +316,82 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 # function to handle the buysell reply
 async def Buysell_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    keyboard = [
+        [InlineKeyboardButton("🔍 Enter Token Address", callback_data='enter_token_address')],
+        [InlineKeyboardButton("🔃️ Swap Swell Tokens", callback_data='swap_tokens')],
+        [InlineKeyboardButton("❌ Close", callback_data="close")]
+    ]
+    main = InlineKeyboardMarkup(keyboard)
+    
+    message = (
+        "🪙 *Token Trading*\n\n"
+        "1. Enter token contract address to analyze\n"
+        "2. Review token information\n"
+        "3. Select wallet and amount\n"
+        "4. Confirm swap"
+    )
+    
     if update.callback_query:
-        await update.callback_query.message.reply_text("I'm Here To Help")
+        await update.callback_query.message.reply_text(
+            message,
+            reply_markup=main,
+            parse_mode="Markdown"
+        )
     elif update.message:
-        await update.message.reply_text("I'm Here To Help")
-
+        await update.message.reply_text(
+            message,
+            reply_markup=main,
+            parse_mode="Markdown"
+        )
+async def analyze_token(update: Update, context: ContextTypes.DEFAULT_TYPE, token_address: str) -> None:
+    try:
+        # Initialize SwellSwapper
+        token_info = await swapper.get_token_info(token_address)
+        
+        # Format token information
+        info_message = (
+            f"*Token Information*\n\n"
+            f"*Symbol:* {token_info['symbol']}\n"
+            f"*Contract Address:* `{token_info['address']}`\n"
+            f"*Launch Date:* {token_info['launch_date']}\n\n"
+            f"*Exchange:* {token_info['exchange']}\n"
+            f"*Market Cap:* ${token_info['market_cap']:,.2f}\n"
+            f"*Liquidity:* ${token_info['liquidity']:,.2f}\n"
+            f"*Token Price:* ${token_info['price']:,.8f}\n"
+            f"*Pooled SWELL:* {token_info['pooled_swell']:,.2f}\n\n"
+            f"*Security Info:*\n"
+            f"- Renounced: {'✅' if token_info['renounced'] else '❌'}\n"
+            f"- Frozen: {'❌' if token_info['frozen'] else '✅'}\n"
+            f"- Revoked: {'❌' if token_info['revoked'] else '✅'}\n\n"
+            f"*Swap Info:*\n"
+            f"1 SWELL = {token_info['swell_ratio']} {token_info['symbol']}\n"
+            f"Price Impact: {token_info['price_impact']}%\n\n"
+            f"*Links:*\n"
+            f"[Website]({token_info['website']}) | "
+            f"[Documentation]({token_info['documentation']})"
+        )
+        
+        # Create keyboard for buying options
+        keyboard = [
+            [InlineKeyboardButton("💰 Buy Token", callback_data=f'buy_{token_address}')],
+            [InlineKeyboardButton("🔄 Refresh Info", callback_data=f'refresh_{token_address}')],
+            [InlineKeyboardButton("❌ Cancel", callback_data='buysell')]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await update.message.reply_text(
+            info_message,
+            reply_markup=reply_markup,
+            parse_mode="Markdown",
+            disable_web_page_preview=True
+        )
+        
+    except Exception as e:
+        await update.message.reply_text(
+            f"❌ Error analyzing token: {str(e)}\n\n"
+            "Please verify the contract address and try again.",
+            parse_mode="Markdown"
+        )
 # function to handle the settings reply
 async def Settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         # function to handle the help reply
@@ -273,7 +410,7 @@ async def CreateWallet_command(update: Update, context: ContextTypes.DEFAULT_TYP
     num = 1
     if wallets:
         for wallet in wallets:
-            balance = balance_check(wallet["address"])
+            balance = await check_balance_command(address=wallet["address"])
             wallet_address.append(
                 [InlineKeyboardButton(f"{num}. {wallet["address"]}", callback_data=f"address_{wallet["address"]}"), 
                 InlineKeyboardButton(f"Balance: {balance}", callback_data="balance")]
@@ -325,14 +462,46 @@ async def tip_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 async def profile_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     # This function should fetch the user's profile information from the database
     user_id = update.effective_user.id
-    wallets = await fetch_all_from_wallet(user_id)
+    wallets = fetch_all_from_wallet(user_id)
     if not wallets:
         await update.message.reply_text("You don't have any wallets yet. Please create a wallet using /wallets.")
         return
-    message = "🆔️ Your Profile:\n"
+    message = "🆔️ Your Profile:\n" \
+    "--------------------------------------------------\n"\
+    "Balance ◎: 0 Swell / $0\n" \
+    "-------------------------------------------------" 
+    wallet_address = []
+    num = 1
     for wallet in wallets:
-        address = wallet['address']
-        private_key = wallet['private_key']
-        balance = await balance_check(address)
-        message += f"Address: {address}\nPrivate Key: {private_key}\nBalance: {balance}\n\n"
-    await update.message.reply_text(message, parse_mode="Markdown")
+        short_address = shorten_address(wallet["address"])
+        wallet_address.append(
+            [InlineKeyboardButton(f"💳️ Wallet {num} {short_address}", callback_data=f"address_{wallet["address"]}"), ]
+        )
+        num += 1
+    keyboard = [
+        [InlineKeyboardButton("🚀️ Sell all", callback_data='sellall'), InlineKeyboardButton("🔥️ Burn_all", callback_data='Burn_all')],
+    ]
+    keyboard2 = [[InlineKeyboardButton("❌ Close", callback_data="close")]]
+    updated_markup = keyboard + wallet_address + keyboard2
+    reply_markup = InlineKeyboardMarkup(updated_markup)
+    if update.callback_query:
+        await update.callback_query.message.reply_text(
+            message,
+            reply_markup=reply_markup,
+            parse_mode="Markdown",
+        )
+    elif update.message:
+        await update.message.reply_text(
+            message,
+            reply_markup=reply_markup,
+            parse_mode="Markdown",
+        )
+
+
+async def check_balance_command(address: str) -> None:
+    try:
+        if address:
+            balance = await swapper.check_swell_balance(address)
+        return balance
+    except Exception as e:
+        print(f"Error checking balance: {e}")
